@@ -207,6 +207,24 @@ fun IrScreen(onBack: () -> Unit) {
 
         Gap()
 
+        Panel(title = "widget tv power") {
+            Mono(
+                "Ada widget home screen \"TV Power\". Tambahkan lewat long-press layar utama → Widget → FlipperDroid.",
+                10,
+                FlipperDim
+            )
+            Gap(6)
+            Mono(
+                "Widget mengirim tombol pertama yang namanya mengandung \"power\" (default: TV Power NEC 0x04/0x08). Kalau belum ada yang cocok, dipakai tombol paling atas.",
+                10,
+                FlipperDim
+            )
+            Gap(6)
+            Mono("Tap judul widget untuk buka aplikasi. Tap tombol ▶ untuk kirim IR.", 10, FlipperDim)
+        }
+
+        Gap()
+
         Panel(title = "tambah kode manual (NEC)") {
             FlipperField(name, { name = it }, "Nama", "mis. AC Living Room")
             Gap(8)

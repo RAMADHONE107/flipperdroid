@@ -3,4 +3,5 @@
     <string name="app_name">FlipperDroid</string>
     <string name="hce_description">FlipperDroid NDEF emulator (Type 4 Tag)</string>
     <string name="hce_aid_group">FlipperDroid NDEF</string>
+    <string name="widget_tv_power_description">Tombol TV Power lewat IR blaster HP</string>
 </resources>

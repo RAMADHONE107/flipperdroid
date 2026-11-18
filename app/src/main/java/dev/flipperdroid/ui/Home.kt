@@ -40,7 +40,7 @@ fun HomeScreen(onOpen: (Screen) -> Unit) {
 
     FlipperScreen(
         title = "FlipperDroid",
-        subtitle = "portable toolkit • v0.4"
+        subtitle = "portable toolkit • v0.5"
     ) {
         Panel(title = "hardware terdeteksi") {
             CapRow("Infrared emitter", hasIr)
@@ -92,7 +92,7 @@ fun HomeScreen(onOpen: (Screen) -> Unit) {
         MenuRow(
             icon = Icons.Filled.WifiTethering,
             label = "Sub-GHz",
-            sub = "CC1101 via USB OTG — raw capture & replay",
+            sub = "CC1101 via OTG — raw capture + decode 433/868",
             badge = "OTG"
         ) { onOpen(Screen.SubGhz) }
         Gap(8)

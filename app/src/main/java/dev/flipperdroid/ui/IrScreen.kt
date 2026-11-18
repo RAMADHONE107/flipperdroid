@@ -132,7 +132,7 @@ fun IrScreen(onBack: () -> Unit) {
 
     FlipperScreen(
         title = "Infrared",
-        subtitle = "NEC • Samsung • Sony • RC5 • RAW",
+        subtitle = "NEC • NECext • Samsung • Sony • RAW",
         onBack = onBack
     ) {
         Panel(title = "status hardware") {
@@ -150,7 +150,7 @@ fun IrScreen(onBack: () -> Unit) {
                 FlipperDim
             )
             Gap(4)
-            Mono("Protokol: NEC, NECext, Samsung32, SIRC/15/20, RC5, RAW.", 10, FlipperDim)
+            Mono("Protokol: NEC, NECext, Samsung32, SIRC/15/20, RAW. RC5 dilewati (butuh pola mulai dari space).", 10, FlipperDim)
             Gap(10)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(

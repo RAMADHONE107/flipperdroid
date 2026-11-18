@@ -47,19 +47,16 @@ object IrEncoder {
     private const val HZ_NEC = 38000
     private const val HZ_SAMSUNG = 38000
     private const val HZ_SONY = 40000
-    private const val HZ_RC5 = 36000
-
-    @Volatile
-    private var rc5Toggle = false
 
     fun supports(protocol: String): Boolean = when (protocol.uppercase()) {
-        "NEC", "NECEXT", "SAMSUNG32", "SIRC", "SIRC15", "SIRC20", "RC5", "RC5X", "RAW" -> true
+        // RC5 sengaja belum didukung: frame-nya diawali level space, sedangkan
+        // ConsumerIrManager mewajibkan pattern dimulai dengan mark.
+        "NEC", "NECEXT", "SAMSUNG32", "SIRC", "SIRC15", "SIRC20", "RAW" -> true
         else -> false
     }
 
     fun frequencyFor(button: IrButton): Int = when (button.protocol.uppercase()) {
         "SIRC", "SIRC15", "SIRC20" -> HZ_SONY
-        "RC5", "RC5X" -> HZ_RC5
         else -> if (button.frequency > 0) button.frequency else HZ_NEC
     }
 
@@ -71,7 +68,6 @@ object IrEncoder {
         "SIRC" -> sony(button.command and 0x7F, button.address and 0x1F, 12)
         "SIRC15" -> sony(button.command and 0xFF, button.address and 0x7F, 15)
         "SIRC20" -> sony(button.command and 0xFF, button.address and 0xFF, 20)
-        "RC5", "RC5X" -> rc5(button.address and 0x1F, button.command and 0x3F)
         "RAW" -> raw(button.raw)
         else -> null
     }
@@ -91,7 +87,7 @@ object IrEncoder {
         return b.build()
     }
 
-    /** NECext: address 16 bit + command 16 bit, tanpa komplemen. */
+    /** NECext: address 16 bit + command 8 bit + komplemen command. */
     fun necExtended(address: Int, command: Int): IntArray {
         val b = IrPattern()
         b.on(9000)
@@ -99,7 +95,7 @@ object IrEncoder {
         necBits(b, address and 0xFF, 8)
         necBits(b, (address shr 8) and 0xFF, 8)
         necBits(b, command and 0xFF, 8)
-        necBits(b, (command shr 8) and 0xFF, 8)
+        necBits(b, command.inv() and 0xFF, 8)
         b.on(560)
         b.off(20000)
         return b.build()
@@ -143,31 +139,6 @@ object IrEncoder {
             b.off(if ((value shr i) and 1 == 1) 1200 else 600)
         }
         return b.build()
-    }
-
-    // ---------------------------------------------------------------- RC5
-
-    /** RC5: 14 bit Manchester, toggle bit dibalik tiap pengiriman. */
-    fun rc5(address: Int, command: Int): IntArray {
-        rc5Toggle = !rc5Toggle
-        val toggle = rc5Toggle
-        val b = IrPattern()
-        manchester(b, 1)          // start bit
-        manchester(b, 1)          // field bit (0 = command, 1 = extended)
-        manchester(b, if (toggle) 1 else 0)
-        for (i in 4 downTo 0) manchester(b, (address shr i) and 1)
-        for (i in 5 downTo 0) manchester(b, (command shr i) and 1)
-        return b.build()
-    }
-
-    private fun manchester(b: IrPattern, bit: Int) {
-        if (bit == 1) {
-            b.off(889)
-            b.on(889)
-        } else {
-            b.on(889)
-            b.off(889)
-        }
     }
 
     // ---------------------------------------------------------------- RAW

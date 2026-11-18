@@ -8,7 +8,7 @@ hardware HP untuk melakukan sebagian fungsi Flipper — dan jujur soal yang tida
 
 ---
 
-## Fitur v0.6.1
+## Fitur v0.7
 
 | Menu | Status | Keterangan |
 |---|---|---|
@@ -22,6 +22,11 @@ hardware HP untuk melakukan sebagian fungsi Flipper — dan jujur soal yang tida
 | **iButton** | ⛔ hardware | Butuh reader 1-Wire. |
 | **Kapabilitas HP** | ✅ | Deteksi runtime: IR, NFC, BT, USB host, model, SDK. |
 | **Tentang** | ✅ | Lisensi & batasan. |
+
+### Baru di 0.7
+
+- Setelah impor, app langsung membuka **layar remote** berisi tombol remote itu (grid 2 kolom, ketuk = kirim IR).
+- Panel **remote tersimpan** di menu Infrared: buka lagi remote yang sudah pernah diimpor tanpa impor ulang.
 
 ### Perbaikan 0.6.1
 

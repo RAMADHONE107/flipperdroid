@@ -61,6 +61,7 @@ fun IrScreen(onBack: () -> Unit) {
     var address by remember { mutableStateOf("") }
     var command by remember { mutableStateOf("") }
     var libraryCategory by remember { mutableStateOf(IrLibrary.categories.first()) }
+    var activeRemote by remember { mutableStateOf<String?>(null) }
 
     val emitter = remember {
         try {
@@ -77,23 +78,21 @@ fun IrScreen(onBack: () -> Unit) {
         }
     }
 
-    fun fire(button: IrButton) {
+    fun fireMessage(button: IrButton): String {
         val service = ir
-        if (service == null || !emitter) {
-            status = "HP ini tidak punya IR emitter."
-            return
-        }
+        if (service == null || !emitter) return "HP ini tidak punya IR emitter."
         val pattern = IrEncoder.build(button)
-        if (pattern == null) {
-            status = "Protokol ${button.protocol} belum didukung. Pakai file raw."
-            return
-        }
-        status = try {
+            ?: return "Protokol ${button.protocol} belum didukung. Pakai file raw."
+        return try {
             service.transmit(IrEncoder.frequencyFor(button), pattern)
             "→ ${button.name} • ${button.describe()}"
         } catch (e: Exception) {
             "Gagal kirim: ${e.message}"
         }
+    }
+
+    fun fire(button: IrButton) {
+        status = fireMessage(button)
     }
 
     fun importLibrary(device: IrLibrary.Device) {
@@ -113,23 +112,27 @@ fun IrScreen(onBack: () -> Unit) {
             return
         }
 
-        val parsed = IrFileParser.parse(text, "${device.brand} ${device.model}")
+        val source = "${device.brand} ${device.model}"
+        val parsed = IrFileParser.parse(text, source)
         val known = buttons.map { it.signature() }.toMutableSet()
         val fresh = parsed.buttons.filter { known.add(it.signature()) }
 
         if (fresh.isEmpty()) {
-            status = "${device.brand} ${device.model}: semua tombol sudah ada."
+            status = "$source: semua tombol sudah ada."
             skippedInfo = ""
+            activeRemote = source
             return
         }
 
         buttons = (buttons + fresh).toMutableList()
         store.save(buttons)
         status = buildString {
-            append("${device.brand} ${device.model}: ${fresh.size} sinyal diimpor")
+            append("$source: ${fresh.size} sinyal diimpor")
             if (parsed.skipped.isNotEmpty()) append(" • ${parsed.skipped.size} dilewati")
         }
         skippedInfo = if (parsed.skipped.isEmpty()) "" else parsed.skipped.take(8).joinToString("\n")
+        // Langsung buka layar tombol remote-nya supaya bisa dipakai tanpa scroll.
+        activeRemote = source
     }
 
     val importLauncher = rememberLauncherForActivityResult(
@@ -141,6 +144,7 @@ fun IrScreen(onBack: () -> Unit) {
         val imported = mutableListOf<IrButton>()
         val skipped = mutableListOf<String>()
         var failedFiles = 0
+        var singleSource: String? = null
 
         for (uri in uris) {
             val fileName = displayName(ctx, uri) ?: "import.ir"
@@ -150,6 +154,7 @@ fun IrScreen(onBack: () -> Unit) {
                 continue
             }
             val source = fileName.removeSuffix(".ir").ifBlank { fileName }
+            if (uris.size == 1) singleSource = source
             val parsed = IrFileParser.parse(text, source)
             for (button in parsed.buttons) {
                 if (known.add(button.signature())) imported.add(button)
@@ -168,6 +173,18 @@ fun IrScreen(onBack: () -> Unit) {
             if (failedFiles > 0) append(" • $failedFiles file gagal dibaca")
         }
         skippedInfo = if (skipped.isEmpty()) "" else skipped.take(8).joinToString("\n")
+        if (imported.isNotEmpty() && singleSource != null) activeRemote = singleSource
+    }
+
+    val openedRemote = activeRemote
+    if (openedRemote != null) {
+        RemoteButtonsScreen(
+            source = openedRemote,
+            buttons = buttons.filter { it.source == openedRemote },
+            onFire = { button -> fireMessage(button) },
+            onBack = { activeRemote = null }
+        )
+        return
     }
 
     FlipperScreen(
@@ -182,6 +199,23 @@ fun IrScreen(onBack: () -> Unit) {
         }
 
         Gap()
+
+        val sources = buttons.map { it.source }.distinct()
+        if (sources.isNotEmpty()) {
+            Panel(title = "remote tersimpan") {
+                Mono("Tap remote untuk buka layar tombolnya — nggak perlu impor ulang.", 10, FlipperDim)
+                Gap(10)
+                sources.forEach { source ->
+                    RemoteRow(
+                        label = source.ifBlank { "manual" },
+                        sub = "${buttons.count { it.source == source }} tombol",
+                        onClick = { activeRemote = source }
+                    )
+                    Gap(8)
+                }
+            }
+            Gap()
+        }
 
         Panel(title = "library remote (offline)") {
             Mono(
@@ -487,6 +521,111 @@ private fun IrButtonRow(button: IrButton, onFire: () -> Unit, onDelete: () -> Un
             color = FlipperDim,
             fontSize = 10.sp,
             modifier = Modifier.clickable { onDelete() }.padding(start = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun RemoteRow(label: String, sub: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color.Black)
+            .border(1.dp, FlipperLine, RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+            Text(label, color = FlipperText, fontSize = 13.sp, maxLines = 2)
+            Text(
+                text = sub,
+                color = FlipperDim,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 9.sp
+            )
+        }
+        Text(
+            text = "BUKA →",
+            color = FlipperOrange,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun RemoteButton(button: IrButton, modifier: Modifier, onClick: () -> Unit) {
+    androidx.compose.foundation.layout.Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color.Black)
+            .border(1.dp, FlipperLine, RoundedCornerShape(8.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 12.dp)
+    ) {
+        Text(button.name, color = FlipperText, fontSize = 13.sp, maxLines = 2)
+        Gap(4)
+        Text(
+            text = if (button.protocol.equals("RAW", ignoreCase = true)) "RAW" else button.protocol,
+            color = FlipperDim,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 9.sp
+        )
+    }
+}
+
+@Composable
+private fun RemoteButtonsScreen(
+    source: String,
+    buttons: List<IrButton>,
+    onFire: (IrButton) -> String,
+    onBack: () -> Unit
+) {
+    var status by remember(source) { mutableStateOf("Tap tombol untuk kirim IR.") }
+
+    FlipperScreen(
+        title = if (source.isBlank()) "manual" else source,
+        subtitle = "${buttons.size} tombol • ketuk untuk kirim",
+        onBack = onBack
+    ) {
+        Panel(title = "status") {
+            Mono(status, 11, FlipperOrange)
+            Gap(6)
+            Mono("IR dipancarkan langsung. Tidak ada konfirmasi balik dari perangkat.", 9, FlipperDim)
+        }
+
+        Gap()
+
+        Panel(title = "tombol") {
+            if (buttons.isEmpty()) {
+                Mono("Tidak ada tombol untuk remote ini.", 10, FlipperDim)
+            }
+            buttons.chunked(2).forEach { pair ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    pair.forEach { button ->
+                        RemoteButton(
+                            button = button,
+                            modifier = Modifier.weight(1f),
+                            onClick = { status = onFire(button) }
+                        )
+                    }
+                    if (pair.size == 1) Spacer(Modifier.weight(1f))
+                }
+                Gap(8)
+            }
+        }
+
+        Gap()
+        Mono(
+            "Tombol tetap tersimpan. Kembali ke daftar untuk pindah remote atau impor yang lain.",
+            9,
+            FlipperDim
         )
     }
 }

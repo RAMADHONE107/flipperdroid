@@ -40,7 +40,7 @@ fun HomeScreen(onOpen: (Screen) -> Unit) {
 
     FlipperScreen(
         title = "FlipperDroid",
-        subtitle = "portable toolkit • v0.1"
+        subtitle = "portable toolkit • v0.2"
     ) {
         Panel(title = "hardware terdeteksi") {
             CapRow("Infrared emitter", hasIr)

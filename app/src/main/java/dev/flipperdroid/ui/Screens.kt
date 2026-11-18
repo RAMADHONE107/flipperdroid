@@ -48,7 +48,7 @@ fun HardwareMissingScreen(
 
 @Composable
 fun AboutScreen(onBack: () -> Unit) {
-    FlipperScreen(title = "Tentang", subtitle = "FlipperDroid 0.1.0", onBack = onBack) {
+    FlipperScreen(title = "Tentang", subtitle = "FlipperDroid 0.2.0", onBack = onBack) {
         Panel(title = "apa ini") {
             Mono(
                 "FlipperDroid adalah aplikasi Android open-source yang meniru antarmuka dan sebagian fungsi Flipper Zero memakai hardware yang memang ada di HP (IR blaster, NFC, Bluetooth HID).",
@@ -82,7 +82,7 @@ fun AboutScreen(onBack: () -> Unit) {
         Gap()
 
         Panel(title = "build") {
-            KeyValue("Versi", "0.1.0")
+            KeyValue("Versi", "0.2.0")
             KeyValue("Target", "Android 9+ (API 28)")
             KeyValue("Bahasa", "Kotlin + Jetpack Compose")
         }

@@ -6,6 +6,12 @@ Toolkit Android bergaya Flipper Zero untuk HP yang punya **IR blaster** dan **NF
 Bukan port firmware. Bukan emulator. Ini aplikasi native Kotlin yang memakai
 hardware HP untuk melakukan sebagian fungsi Flipper — dan jujur soal yang tidak bisa.
 
+## Download APK
+
+APK siap pasang ada di tab **[Releases](../../releases)** repo ini
+(build otomatis dari GitHub Actions, ditandatangani debug key).
+Untuk build sendiri, lihat bagian **Build APK tanpa PC** di bawah.
+
 ---
 
 ## Fitur v0.7
@@ -132,7 +138,7 @@ perangkat, coba balik tanda durasi (polaritas GDO0 bisa berbeda antar board).
 
 ## Lisensi & catatan legal
 
-- Kode proyek ini: **GPL-3.0**.
+- Kode proyek ini: **GPL-3.0** — teks lengkap ada di file [`LICENSE`](LICENSE).
 - Data remote bawaan berasal dari **Flipper-IRDB** (`Lucaslhm/Flipper-IRDB`) yang dirilis **CC0-1.0** (domain publik). Hanya file yang protokolnya didukung app yang dibundel.
 - Protokol NEC diimplementasikan ulang dari spesifikasi publik — bukan salinan kode Flipper.
 - Nama/merek **Flipper Zero** milik Flipper Devices Inc. Proyek ini **tidak berafiliasi**.

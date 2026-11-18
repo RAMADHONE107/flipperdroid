@@ -40,7 +40,7 @@ fun HomeScreen(onOpen: (Screen) -> Unit) {
 
     FlipperScreen(
         title = "FlipperDroid",
-        subtitle = "portable toolkit • v0.5"
+        subtitle = "portable toolkit • v0.6"
     ) {
         Panel(title = "hardware terdeteksi") {
             CapRow("Infrared emitter", hasIr)
@@ -60,7 +60,7 @@ fun HomeScreen(onOpen: (Screen) -> Unit) {
         MenuRow(
             icon = Icons.Filled.SettingsRemote,
             label = "Infrared",
-            sub = "Kirim kode remote TV / AC / proyektor",
+            sub = "TV / AC / proyektor — 33 remote bawaan",
             badge = if (hasIr) "READY" else "N/A"
         ) { onOpen(Screen.Ir) }
         Gap(8)

@@ -9,12 +9,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -40,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import dev.flipperdroid.ir.IrButton
 import dev.flipperdroid.ir.IrEncoder
 import dev.flipperdroid.ir.IrFileParser
+import dev.flipperdroid.ir.IrLibrary
 import dev.flipperdroid.ir.IrStore
 import java.util.UUID
 
@@ -57,6 +60,7 @@ fun IrScreen(onBack: () -> Unit) {
     var name by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
     var command by remember { mutableStateOf("") }
+    var libraryCategory by remember { mutableStateOf(IrLibrary.categories.first()) }
 
     val emitter = remember {
         try {
@@ -90,6 +94,36 @@ fun IrScreen(onBack: () -> Unit) {
         } catch (e: Exception) {
             "Gagal kirim: ${e.message}"
         }
+    }
+
+    fun importLibrary(device: IrLibrary.Device) {
+        val text = try {
+            ctx.assets.open(device.asset).bufferedReader().use { it.readText() }
+        } catch (e: Exception) {
+            null
+        }
+        if (text == null) {
+            status = "Gagal membaca ${device.asset} dari asset."
+            return
+        }
+
+        val parsed = IrFileParser.parse(text, "${device.brand} ${device.model}")
+        val known = buttons.map { it.signature() }.toMutableSet()
+        val fresh = parsed.buttons.filter { known.add(it.signature()) }
+
+        if (fresh.isEmpty()) {
+            status = "${device.brand} ${device.model}: semua tombol sudah ada."
+            skippedInfo = ""
+            return
+        }
+
+        buttons = (buttons + fresh).toMutableList()
+        store.save(buttons)
+        status = buildString {
+            append("${device.brand} ${device.model}: ${fresh.size} sinyal diimpor")
+            if (parsed.skipped.isNotEmpty()) append(" • ${parsed.skipped.size} dilewati")
+        }
+        skippedInfo = if (parsed.skipped.isEmpty()) "" else parsed.skipped.take(8).joinToString("\n")
     }
 
     val importLauncher = rememberLauncherForActivityResult(
@@ -139,6 +173,64 @@ fun IrScreen(onBack: () -> Unit) {
             KeyValue("IR emitter", if (emitter) "ADA" else "TIDAK ADA", if (emitter) FlipperGreen else FlipperRed)
             KeyValue("Carrier 38 kHz", if (has38k) "didukung" else "cek manual")
             KeyValue("Tombol tersimpan", "${buttons.size}")
+        }
+
+        Gap()
+
+        Panel(title = "library remote (offline)") {
+            Mono(
+                "33 remote siap pakai dari Flipper-IRDB (lisensi CC0). Tap satu untuk impor semua tombolnya — nggak perlu cari file .ir.",
+                10,
+                FlipperDim
+            )
+            Gap(10)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                IrLibrary.categories.forEach { category ->
+                    LibraryChip(category, category == libraryCategory) {
+                        libraryCategory = category
+                    }
+                }
+            }
+            Gap(10)
+            IrLibrary.byCategory(libraryCategory).forEach { device ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.Black)
+                        .border(1.dp, FlipperLine, RoundedCornerShape(8.dp))
+                        .clickable { importLibrary(device) }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                        Text(
+                            "${device.brand} • ${device.model}",
+                            color = FlipperText,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            "${device.signals} sinyal • ${device.category}",
+                            color = FlipperDim,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.sp
+                        )
+                    }
+                    Text(
+                        "IMPOR →",
+                        color = FlipperOrange,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Gap(8)
+            }
         }
 
         Gap()
@@ -308,6 +400,23 @@ private fun displayName(ctx: Context, uri: Uri): String? = try {
     }
 } catch (e: Exception) {
     null
+}
+
+@Composable
+private fun LibraryChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        text = label,
+        color = if (selected) Color.Black else FlipperOrange,
+        fontFamily = FontFamily.Monospace,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (selected) FlipperOrange else FlipperPanel)
+            .border(1.dp, if (selected) FlipperOrange else FlipperLine, RoundedCornerShape(6.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 7.dp)
+    )
 }
 
 @Composable

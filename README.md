@@ -8,11 +8,11 @@ hardware HP untuk melakukan sebagian fungsi Flipper — dan jujur soal yang tida
 
 ---
 
-## Fitur v0.5
+## Fitur v0.6
 
 | Menu | Status | Keterangan |
 |---|---|---|
-| **Infrared** | ✅ jalan | Kirim 38 kHz lewat IR blaster. Impor file `.ir` (format Flipper/IRDB) berisi NEC, NECext, Samsung32, SIRC/15/20, dan RAW (remote AC). Tombol bisa juga ditambah manual. |
+| **Infrared** | ✅ jalan | Kirim 38 kHz lewat IR blaster. **33 remote bawaan offline** (TV, AC, proyektor, soundbar, kipas) dari Flipper-IRDB, plus impor file `.ir` sendiri (NEC, NECext, Samsung32, SIRC/15/20, RAW). Tombol bisa ditambah manual. |
 | **NFC** | ✅ jalan | Reader mode: baca UID, daftar teknologi, isi NDEF. Dump halaman MIFARE Ultralight / NTAG (bisa disalin). Tulis teks/link ke tag NDEF atau format tag kosong. |
 | **NFC Emulator (HCE)** | ✅ jalan | HP jadi kartu NFC Forum Type 4 Tag dengan **banyak record** (teks + URL + vCard). APDU `D2760000850101`, bisa dibaca HP lain / Flipper / reader USB. |
 | **Bad-BT Keyboard** | ✅ jalan | HP jadi keyboard HID Bluetooth. Pasangkan ke PC, lalu "ketik" payload otomatis. |
@@ -64,6 +64,7 @@ app/src/main/java/dev/flipperdroid/
 ├── caps/Caps.kt             # deteksi kemampuan hardware
 ├── ir/IrEncoder.kt          # encoder NEC/NECext/Samsung32/SIRC + RAW
 ├── ir/IrFileParser.kt       # parser file .ir (Flipper / IRDB)
+├── ir/IrLibrary.kt          # katalog 33 remote bawaan (asset .ir)
 ├── ir/IrStore.kt            # simpan tombol IR (SharedPreferences/JSON)
 ├── nfc/NfcReader.kt         # baca/tulis tag NDEF
 ├── nfc/UltralightDump.kt    # dump halaman MIFARE Ultralight / NTAG
@@ -114,11 +115,13 @@ perangkat, coba balik tanda durasi (polaritas GDO0 bisa berbeda antar board).
 - [ ] Import/export tombol IR ke file JSON
 - [x] Decoder protokol Sub-GHz (Princeton, CAME, Keeloq) di aplikasi
 - [x] Widget cepat: "TV Power" di layar utama
+- [x] Library remote offline (TV/AC/proyektor/audio/kipas) di dalam APK
 - [ ] Tema: opsi font pixel & animasi dolphin
 
 ## Lisensi & catatan legal
 
 - Kode proyek ini: **GPL-3.0**.
+- Data remote bawaan berasal dari **Flipper-IRDB** (`Lucaslhm/Flipper-IRDB`) yang dirilis **CC0-1.0** (domain publik). Hanya file yang protokolnya didukung app yang dibundel.
 - Protokol NEC diimplementasikan ulang dari spesifikasi publik — bukan salinan kode Flipper.
 - Nama/merek **Flipper Zero** milik Flipper Devices Inc. Proyek ini **tidak berafiliasi**.
 - Gunakan hanya pada perangkat dan jaringan milikmu atau yang kamu punya izinnya.

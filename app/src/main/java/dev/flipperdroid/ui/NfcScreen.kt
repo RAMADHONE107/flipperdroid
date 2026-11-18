@@ -1,0 +1,161 @@
+package dev.flipperdroid.ui
+
+import android.app.Activity
+import android.nfc.NfcAdapter
+import android.nfc.Tag
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import dev.flipperdroid.nfc.NfcReader
+import dev.flipperdroid.nfc.TagInfo
+
+@Composable
+fun NfcScreen(onBack: () -> Unit) {
+    val ctx = LocalContext.current
+    val activity = ctx as? Activity
+    val adapter = remember { NfcAdapter.getDefaultAdapter(ctx) }
+
+    var info by remember { mutableStateOf<TagInfo?>(null) }
+    var lastTag by remember { mutableStateOf<Tag?>(null) }
+    var status by remember {
+        mutableStateOf(
+            when {
+                adapter == null -> "HP ini tidak punya NFC."
+                !adapter.isEnabled -> "NFC mati. Nyalakan dulu di Setelan."
+                else -> "Tempelkan tag NFC ke punggung HP."
+            }
+        )
+    }
+    var text by remember { mutableStateOf("https://example.com") }
+
+    DisposableEffect(adapter, activity) {
+        if (adapter != null && activity != null) {
+            val callback = NfcAdapter.ReaderCallback { tag ->
+                val read = NfcReader.read(tag)
+                activity.runOnUiThread {
+                    lastTag = tag
+                    info = read
+                    status = "Tag terbaca."
+                }
+            }
+            val flags = NfcAdapter.FLAG_READER_NFC_A or
+                NfcAdapter.FLAG_READER_NFC_B or
+                NfcAdapter.FLAG_READER_NFC_F or
+                NfcAdapter.FLAG_READER_NFC_V or
+                NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS
+            try {
+                adapter.enableReaderMode(activity, callback, flags, null)
+            } catch (e: Exception) {
+                status = "Gagal aktifkan reader: ${e.message}"
+            }
+        }
+        onDispose {
+            if (adapter != null && activity != null) {
+                try {
+                    adapter.disableReaderMode(activity)
+                } catch (e: Exception) {
+                    // diabaikan
+                }
+            }
+        }
+    }
+
+    FlipperScreen(
+        title = "NFC",
+        subtitle = "13.56 MHz • baca & tulis NDEF",
+        onBack = onBack
+    ) {
+        Panel(title = "status") {
+            KeyValue("Adapter", if (adapter != null) "ADA" else "TIDAK ADA", if (adapter != null) FlipperGreen else FlipperRed)
+            KeyValue("Aktif", if (adapter?.isEnabled == true) "ya" else "tidak", if (adapter?.isEnabled == true) FlipperGreen else FlipperRed)
+            KeyValue("Mode", "reader mode (foreground)")
+            Gap(8)
+            Mono(status, 11, FlipperOrange)
+        }
+
+        Gap()
+
+        val current = info
+        if (current != null) {
+            Panel(title = "tag terbaca") {
+                KeyValue("UID", current.uid)
+                KeyValue("Teknologi", current.techs.joinToString(", ").ifBlank { "-" })
+                KeyValue("Kapasitas", if (current.maxSize > 0) "${current.maxSize} byte" else "-")
+                KeyValue("NDEF", if (current.readableNdef) "ada" else "kosong / bukan NDEF")
+                if (current.records.isNotEmpty()) {
+                    Gap(8)
+                    current.records.forEach { record ->
+                        Mono("• $record", 10, FlipperText)
+                    }
+                }
+            }
+            Gap()
+        }
+
+        Panel(title = "tulis NDEF (teks/link)") {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("Isi NDEF", fontSize = 11.sp) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = FlipperOrange,
+                    unfocusedBorderColor = FlipperLine,
+                    focusedLabelColor = FlipperOrange,
+                    unfocusedLabelColor = FlipperDim,
+                    cursorColor = FlipperOrange,
+                    focusedTextColor = FlipperText,
+                    unfocusedTextColor = FlipperText,
+                    focusedContainerColor = Color.Black,
+                    unfocusedContainerColor = Color.Black
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Gap(10)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        val tag = lastTag
+                        if (tag == null) {
+                            status = "Tempelkan tag dulu, baru tulis."
+                        } else {
+                            status = NfcReader.writeText(tag, text)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FlipperOrange, contentColor = Color.Black)
+                ) {
+                    Text(
+                        "TULIS KE TAG TERAKHIR",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        Gap()
+        Mono(
+            "Catatan: HP tidak bisa mengkloning kartu akses (MIFARE Classic UID) tanpa root + firmware NFC yang dipatch. Yang didukung: baca UID/teknologi, baca & tulis NDEF.",
+            10,
+            FlipperDim
+        )
+    }
+}

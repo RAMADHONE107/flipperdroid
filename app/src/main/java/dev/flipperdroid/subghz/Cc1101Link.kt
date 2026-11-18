@@ -157,6 +157,14 @@ class Cc1101Link(
 
                 readLoop(serial)
             } catch (e: Exception) {
+                val stuck = port
+                port = null
+                running = false
+                try {
+                    stuck?.close()
+                } catch (ignored: Exception) {
+                    // diabaikan
+                }
                 post { listener.onStatus("Gagal buka port: ${e.message}") }
             }
         }.start()

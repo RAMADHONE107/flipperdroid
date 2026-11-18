@@ -8,15 +8,15 @@ hardware HP untuk melakukan sebagian fungsi Flipper — dan jujur soal yang tida
 
 ---
 
-## Fitur v0.1
+## Fitur v0.4
 
 | Menu | Status | Keterangan |
 |---|---|---|
 | **Infrared** | ✅ jalan | Kirim 38 kHz lewat IR blaster. Impor file `.ir` (format Flipper/IRDB) berisi NEC, NECext, Samsung32, SIRC/15/20, dan RAW (remote AC). Tombol bisa juga ditambah manual. |
-| **NFC** | ✅ jalan | Reader mode: baca UID, daftar teknologi, isi NDEF. Tulis teks/link ke tag NDEF atau format tag kosong. |
-| **NFC Emulator (HCE)** | ✅ jalan | HP jadi kartu NFC Forum Type 4 Tag. Emulasi NDEF text/URL lewat APDU (`D2760000850101`), bisa dibaca HP lain / Flipper / reader USB. |
+| **NFC** | ✅ jalan | Reader mode: baca UID, daftar teknologi, isi NDEF. Dump halaman MIFARE Ultralight / NTAG (bisa disalin). Tulis teks/link ke tag NDEF atau format tag kosong. |
+| **NFC Emulator (HCE)** | ✅ jalan | HP jadi kartu NFC Forum Type 4 Tag dengan **banyak record** (teks + URL + vCard). APDU `D2760000850101`, bisa dibaca HP lain / Flipper / reader USB. |
 | **Bad-BT Keyboard** | ✅ jalan | HP jadi keyboard HID Bluetooth. Pasangkan ke PC, lalu "ketik" payload otomatis. |
-| **Sub-GHz** | ⛔ hardware | Butuh CC1101. Halaman menampilkan status OTG + penjelasan. |
+| **Sub-GHz** | 🔌 butuh board | CC1101 + ESP32 lewat USB serial OTG: capture raw & replay 315/433/868/915 MHz. Firmware contoh ada di `firmware/cc1101_bridge`. |
 | **RFID 125 kHz** | ⛔ hardware | Butuh reader 125 kHz (Proxmark3/RDM6300). |
 | **iButton** | ⛔ hardware | Butuh reader 1-Wire. |
 | **Kapabilitas HP** | ✅ | Deteksi runtime: IR, NFC, BT, USB host, model, SDK. |
@@ -61,19 +61,50 @@ hanya tersedia untuk x86_64. Alternatif di HP: aplikasi **AndroidIDE**.
 app/src/main/java/dev/flipperdroid/
 ├── MainActivity.kt          # navigasi antar layar
 ├── caps/Caps.kt             # deteksi kemampuan hardware
-├── ir/Nec.kt                # encoder protokol NEC (implementasi sendiri)
+├── ir/IrEncoder.kt          # encoder NEC/NECext/Samsung32/SIRC + RAW
+├── ir/IrFileParser.kt       # parser file .ir (Flipper / IRDB)
 ├── ir/IrStore.kt            # simpan tombol IR (SharedPreferences/JSON)
 ├── nfc/NfcReader.kt         # baca/tulis tag NDEF
+├── nfc/UltralightDump.kt    # dump halaman MIFARE Ultralight / NTAG
+├── hce/NdefEmulator.kt      # Type 4 Tag: CC + NDEF file
+├── hce/NdefHostApduService.kt
+├── subghz/Cc1101Link.kt     # USB serial ke firmware CC1101
 ├── hid/HidKeyboard.kt       # BluetoothHidDevice + map karakter → HID keycode
-└── ui/                      # Compose: theme, home, IR, NFC, HID, caps, about
+└── ui/                      # Compose: theme, home, IR, NFC, HCE, Sub-GHz, HID
 ```
 
-## Roadmap v0.2
+## Sub-GHz: rangkaian minimum
+
+CC1101 tidak punya USB, jadi butuh microcontroller sebagai jembatan serial:
+
+| CC1101 | ESP32 |
+|---|---|
+| VCC | 3V3 (jangan 5V) |
+| GND | GND |
+| SCK | GPIO18 |
+| MISO | GPIO19 |
+| MOSI | GPIO23 |
+| CSN | GPIO5 |
+| GDO0 | GPIO4 |
+
+1. Install library **SmartRC-CC1101-Driver-Lib** di Arduino IDE.
+2. Flash `firmware/cc1101_bridge/cc1101_bridge.ino` ke ESP32.
+3. Colok ESP32 ke HP pakai kabel OTG → buka menu **Sub-GHz** → **SCAN USB** → izinkan.
+4. Pilih frekuensi → **MULAI RX** → pencet remote → frame muncul di daftar → tap untuk replay.
+
+Protokol serial (115200 8N1): `PING`, `FREQ <hz>`, `RX`, `IDLE`, `TX <durasi,...>`.
+Durasi dalam mikrodetik, positif = carrier ON (konvensi Flipper Raw_Data).
+
+Firmware ini contoh dan belum diuji di semua modul. Kalau replay tidak memicu
+perangkat, coba balik tanda durasi (polaritas GDO0 bisa berbeda antar board).
+
+## Roadmap
 
 - [x] Import file `.ir` dari database IR (format Flipper/IRDB) + protokol Sony SIRC, Samsung, NECext, RAW
+- [x] Sub-GHz RX/TX raw via CC1101 + USB serial (OTG)
+- [x] NFC: dump MIFARE Ultralight + NDEF multi-record di HCE
 - [ ] Import/export tombol IR ke file JSON
-- [ ] Sub-GHz RX via CC1101 + USB serial (OTG)
-- [ ] NFC: dump MIFARE Ultralight, emulate NDEF dengan beberapa record sekaligus
+- [ ] Decoder protokol Sub-GHz (Princeton, CAME, Keeloq) di firmware
 - [ ] Widget cepat: "TV Power" di layar utama
 - [ ] Tema: opsi font pixel & animasi dolphin
 

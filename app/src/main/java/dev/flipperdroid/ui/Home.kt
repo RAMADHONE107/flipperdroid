@@ -40,7 +40,7 @@ fun HomeScreen(onOpen: (Screen) -> Unit) {
 
     FlipperScreen(
         title = "FlipperDroid",
-        subtitle = "portable toolkit • v0.3"
+        subtitle = "portable toolkit • v0.4"
     ) {
         Panel(title = "hardware terdeteksi") {
             CapRow("Infrared emitter", hasIr)
@@ -68,7 +68,7 @@ fun HomeScreen(onOpen: (Screen) -> Unit) {
         MenuRow(
             icon = Icons.Filled.Nfc,
             label = "NFC",
-            sub = "Baca UID, tulis NDEF, info teknologi",
+            sub = "Baca UID, dump Ultralight, tulis NDEF",
             badge = if (hasNfc) "READY" else "N/A"
         ) { onOpen(Screen.Nfc) }
         Gap(8)
@@ -76,7 +76,7 @@ fun HomeScreen(onOpen: (Screen) -> Unit) {
         MenuRow(
             icon = Icons.Filled.Share,
             label = "NFC Emulator",
-            sub = "HP jadi kartu NDEF (Host Card Emulation)",
+            sub = "HP jadi tag NDEF multi-record (HCE)",
             badge = if (hasNfc) "READY" else "N/A"
         ) { onOpen(Screen.Hce) }
         Gap(8)
@@ -92,7 +92,7 @@ fun HomeScreen(onOpen: (Screen) -> Unit) {
         MenuRow(
             icon = Icons.Filled.WifiTethering,
             label = "Sub-GHz",
-            sub = "433/868/915 MHz — butuh CC1101",
+            sub = "CC1101 via USB OTG — raw capture & replay",
             badge = "OTG"
         ) { onOpen(Screen.SubGhz) }
         Gap(8)

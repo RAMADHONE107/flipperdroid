@@ -1,6 +1,9 @@
 package dev.flipperdroid.ui
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.flipperdroid.nfc.NfcReader
 import dev.flipperdroid.nfc.TagInfo
+import dev.flipperdroid.nfc.UltralightDump
 
 @Composable
 fun NfcScreen(onBack: () -> Unit) {
@@ -35,6 +39,7 @@ fun NfcScreen(onBack: () -> Unit) {
 
     var info by remember { mutableStateOf<TagInfo?>(null) }
     var lastTag by remember { mutableStateOf<Tag?>(null) }
+    var dump by remember { mutableStateOf<UltralightDump.Result?>(null) }
     var status by remember {
         mutableStateOf(
             when {
@@ -50,9 +55,20 @@ fun NfcScreen(onBack: () -> Unit) {
         if (adapter != null && activity != null) {
             val callback = NfcAdapter.ReaderCallback { tag ->
                 val read = NfcReader.read(tag)
+                // Callback ini jalan di binder thread, jadi aman untuk I/O NFC.
+                val ultralight = try {
+                    if (tag.techList.any { it.endsWith("MifareUltralight") }) {
+                        UltralightDump.dump(tag)
+                    } else {
+                        null
+                    }
+                } catch (e: Exception) {
+                    null
+                }
                 activity.runOnUiThread {
                     lastTag = tag
                     info = read
+                    dump = ultralight
                     status = "Tag terbaca."
                 }
             }
@@ -110,6 +126,58 @@ fun NfcScreen(onBack: () -> Unit) {
             Gap()
         }
 
+        val dumpResult = dump
+        if (dumpResult != null) {
+            Panel(title = "dump MIFARE Ultralight") {
+                KeyValue("Tipe", dumpResult.type)
+                KeyValue("Halaman", if (dumpResult.pages > 0) "${dumpResult.pages}" else "-")
+                KeyValue("Baris data", "${dumpResult.lines.size}")
+
+                if (dumpResult.error != null) {
+                    Gap(8)
+                    Mono(dumpResult.error, 10, FlipperRed)
+                }
+
+                if (dumpResult.lines.isNotEmpty()) {
+                    Gap(8)
+                    dumpResult.lines.take(48).forEach { line ->
+                        Mono(line, 9, FlipperText)
+                    }
+                    if (dumpResult.lines.size > 48) {
+                        Gap(6)
+                        Mono("… ${dumpResult.lines.size - 48} halaman lagi. Salin untuk lihat semua.", 9, FlipperDim)
+                    }
+                }
+
+                Gap(10)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = {
+                            try {
+                                val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                clipboard?.setPrimaryClip(
+                                    ClipData.newPlainText("FlipperDroid dump", dumpResult.asText())
+                                )
+                                status = "Dump disalin ke clipboard (${dumpResult.lines.size} halaman)."
+                            } catch (e: Exception) {
+                                status = "Gagal salin: ${e.message}"
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = FlipperOrange, contentColor = Color.Black)
+                    ) {
+                        Text("SALIN DUMP", fontFamily = FontFamily.Monospace, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = { dump = null },
+                        colors = ButtonDefaults.buttonColors(containerColor = FlipperPanel, contentColor = FlipperOrange)
+                    ) {
+                        Text("TUTUP", fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                    }
+                }
+            }
+            Gap()
+        }
+
         Panel(title = "tulis NDEF (teks/link)") {
             OutlinedTextField(
                 value = text,
@@ -153,7 +221,7 @@ fun NfcScreen(onBack: () -> Unit) {
 
         Gap()
         Mono(
-            "Catatan: HP tidak bisa mengkloning kartu akses (MIFARE Classic UID) tanpa root + firmware NFC yang dipatch. Yang didukung: baca UID/teknologi, baca & tulis NDEF.",
+            "Catatan: HP tidak bisa mengkloning kartu akses (MIFARE Classic UID) tanpa root + firmware NFC yang dipatch. Yang didukung: baca UID/teknologi, dump halaman MIFARE Ultralight/NTAG, baca & tulis NDEF.",
             10,
             FlipperDim
         )

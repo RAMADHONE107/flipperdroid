@@ -22,6 +22,7 @@ import dev.flipperdroid.ui.HomeScreen
 import dev.flipperdroid.ui.IrScreen
 import dev.flipperdroid.ui.NfcScreen
 import dev.flipperdroid.ui.Screen
+import dev.flipperdroid.ui.SubGhzScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -51,14 +52,7 @@ private fun App() {
         Screen.Hid -> HidScreen(onBack = { screen = Screen.Home })
         Screen.Caps -> CapsScreen(onBack = { screen = Screen.Home })
         Screen.About -> AboutScreen(onBack = { screen = Screen.Home })
-        Screen.SubGhz -> HardwareMissingScreen(
-            title = "Sub-GHz",
-            subtitle = "300-928 MHz",
-            what = "Flipper memakai chip CC1101 + antena untuk membaca dan memutar sinyal 433/868/915 MHz (remote gerbang, sensor, weather station). HP tidak punya radio di frekuensi ini.",
-            hardware = "CC1101 board via USB-Serial (OTG)",
-            note = "Kalau kamu punya CC1101 + Arduino/USB-TTL, modul bisa ditambahkan lewat serial OTG di update berikutnya.",
-            onBack = { screen = Screen.Home }
-        )
+        Screen.SubGhz -> SubGhzScreen(onBack = { screen = Screen.Home })
         Screen.Rfid -> HardwareMissingScreen(
             title = "RFID 125 kHz",
             subtitle = "EM4100 / T5577 / HID",

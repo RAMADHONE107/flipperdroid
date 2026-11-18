@@ -52,14 +52,33 @@ object SubGhzDecoder {
         val values = parse(csv)
         if (values.size < 24) return null
 
-        val sync = values.indexOfFirst { it >= 3500 }
-        if (sync < 1) return null
+        val sync = values.indexOfFirst { it >= SYNC_MIN }
 
-        val pre = values.subList(0, sync)
-        val post = values.subList(sync + 1, values.size)
-        if (post.size < 20) return null
+        // CAME dan Keeloq: ada header panjang sebelum data.
+        if (sync >= 0) {
+            val pre = if (sync > 0) values.subList(0, sync) else emptyList()
+            var end = sync + 1
+            while (end < values.size && values[end] < SYNC_MIN) end++
+            val post = values.subList(sync + 1, end)
 
-        return keeloq(pre, post) ?: princetonOrCame(post)
+            if (post.size >= 20) {
+                if (pre.size >= 6) keeloq(pre, post)?.let { return it }
+                came(values[sync], post)?.let { return it }
+            }
+        }
+
+        // Princeton tidak punya header; guard gap memisahkan tiap frame.
+        // Coba setiap potongan di antara guard, bukan cuma awal/akhir.
+        var start = 0
+        for (index in 0..values.size) {
+            val boundary = index == values.size || values[index] >= SYNC_MIN
+            if (!boundary) continue
+            val segment = values.subList(start, index)
+            if (segment.size in 40..70) princeton(segment)?.let { return it }
+            start = index + 1
+        }
+
+        return null
     }
 
     // ------------------------------------------------------------- Keeloq
@@ -94,45 +113,68 @@ object SubGhzDecoder {
 
     // --------------------------------------------------- Princeton / CAME
 
-    private fun princetonOrCame(post: List<Int>): Decode? {
+    private fun princeton(post: List<Int>): Decode? {
         val teShort = estimateShort(post) ?: return null
         val teLong = estimateLong(post, teShort)
         val ratio = teLong.toDouble() / teShort
+        if (ratio < 2.4 || ratio > 3.6) return null
 
-        // CAME punya start bit ekstra sebelum data.
-        val came = decodePwm(post, 1, teShort, teLong, onePatternIsShortLong = false, maxBits = 42)
-        if (came != null && came.second in CAME_BITS && ratio < 2.5) {
-            return Decode(
-                protocol = "CAME",
-                bits = came.second,
-                code = came.first
-            )
-        }
+        val parsed = decodePwm(
+            post,
+            0,
+            teShort,
+            teLong,
+            onePatternIsShortLong = false,
+            maxBits = 24
+        ) ?: return null
 
-        val princeton = decodePwm(post, 0, teShort, teLong, onePatternIsShortLong = false, maxBits = 24)
-        if (princeton != null && princeton.second == 24) {
-            val code = princeton.first
-            return Decode(
-                protocol = "Princeton",
-                bits = 24,
-                code = code,
-                serial = code ushr 4,
-                button = (code and 0x0F).toInt()
-            )
-        }
+        if (parsed.second != 24) return null
 
-        if (came != null && came.second in CAME_BITS) {
-            return Decode("CAME", came.second, came.first)
+        // Frame 24 bit = 48 durasi + 1 stop mark (guard sudah dibuang).
+        if (post.size !in 48..60) return null
+
+        val code = parsed.first
+        return Decode(
+            protocol = "Princeton",
+            bits = 24,
+            code = code,
+            serial = code ushr 4,
+            button = (code and 0x0F).toInt()
+        )
+    }
+
+    private fun came(header: Int, post: List<Int>): Decode? {
+        val teShort = estimateShort(post) ?: return null
+        val teLong = estimateLong(post, teShort)
+        val ratio = teLong.toDouble() / teShort
+        if (ratio < 1.7 || ratio > 2.6) return null
+
+        val parsed = decodePwm(
+            post,
+            1,
+            teShort,
+            teLong,
+            onePatternIsShortLong = false,
+            maxBits = 42
+        ) ?: return null
+
+        if (parsed.second !in CAME_BITS) return null
+
+        // Post harus habis tepat setelah bit terakhir (start bit + 2*n durasi).
+        if (post.size != parsed.second * 2 + 1) return null
+
+        // Header CAME kelipatan te: 47 (12/18 bit), 76 (24/42 bit), 36 (25 bit).
+        // Ini yang membedakan CAME asli dari guard gap Princeton (~30 te).
+        val expected = when (parsed.second) {
+            12, 18 -> 47
+            24, 42 -> 76
+            25 -> 36
+            else -> return null
         }
-        if (princeton != null && princeton.second in 20..28) {
-            return Decode(
-                protocol = "Princeton?",
-                bits = princeton.second,
-                code = princeton.first,
-                note = "Jumlah bit tidak persis 24, kemungkinan noise di awal/akhir."
-            )
-        }
-        return null
+        val headerRatio = header.toDouble() / teShort
+        if (abs(headerRatio - expected) > expected * 0.3) return null
+
+        return Decode("CAME", parsed.second, parsed.first)
     }
 
     // ------------------------------------------------------------- Helper
@@ -218,4 +260,7 @@ object SubGhzDecoder {
         }
         return result
     }
+
+    /** Durasi di atas ini dianggap header / guard gap. */
+    private const val SYNC_MIN = 3500
 }

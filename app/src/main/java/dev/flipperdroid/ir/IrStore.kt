@@ -4,17 +4,6 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
-data class IrButton(
-    val name: String,
-    val protocol: String = "NEC",
-    val address: Int = 0,
-    val command: Int = 0,
-    val frequency: Int = 38000
-) {
-    fun addressHex(): String = "0x%02X".format(address and 0xFF)
-    fun commandHex(): String = "0x%02X".format(command and 0xFF)
-}
-
 class IrStore(context: Context) {
 
     private val prefs = context.getSharedPreferences("flipperdroid_ir", Context.MODE_PRIVATE)
@@ -28,11 +17,14 @@ class IrStore(context: Context) {
                 val o = array.getJSONObject(i)
                 list.add(
                     IrButton(
+                        id = o.optString("id", "").ifBlank { java.util.UUID.randomUUID().toString() },
                         name = o.optString("name", "Remote"),
                         protocol = o.optString("protocol", "NEC"),
                         address = o.optInt("address", 0),
                         command = o.optInt("command", 0),
-                        frequency = o.optInt("frequency", 38000)
+                        frequency = o.optInt("frequency", 38000),
+                        raw = o.optString("raw", "").let { parseRaw(it) },
+                        source = o.optString("source", "")
                     )
                 )
             }
@@ -44,23 +36,32 @@ class IrStore(context: Context) {
 
     fun save(list: List<IrButton>) {
         val array = JSONArray()
-        for (b in list) {
+        for (button in list) {
             val o = JSONObject()
-            o.put("name", b.name)
-            o.put("protocol", b.protocol)
-            o.put("address", b.address)
-            o.put("command", b.command)
-            o.put("frequency", b.frequency)
+            o.put("id", button.id)
+            o.put("name", button.name)
+            o.put("protocol", button.protocol)
+            o.put("address", button.address)
+            o.put("command", button.command)
+            o.put("frequency", button.frequency)
+            o.put("raw", button.raw?.joinToString(",") ?: "")
+            o.put("source", button.source)
             array.put(o)
         }
         prefs.edit().putString(KEY, array.toString()).apply()
     }
 
+    private fun parseRaw(raw: String): IntArray? {
+        if (raw.isBlank()) return null
+        val values = raw.split(",").mapNotNull { it.trim().toIntOrNull() }
+        return if (values.isEmpty()) null else values.toIntArray()
+    }
+
     private fun defaults(): MutableList<IrButton> = mutableListOf(
-        IrButton("TV Power", address = 0x04, command = 0x08),
-        IrButton("TV Volume +", address = 0x04, command = 0x02),
-        IrButton("TV Volume -", address = 0x04, command = 0x03),
-        IrButton("TV Mute", address = 0x04, command = 0x09)
+        IrButton(name = "TV Power", address = 0x04, command = 0x08),
+        IrButton(name = "TV Volume +", address = 0x04, command = 0x02),
+        IrButton(name = "TV Volume -", address = 0x04, command = 0x03),
+        IrButton(name = "TV Mute", address = 0x04, command = 0x09)
     )
 
     private companion object {

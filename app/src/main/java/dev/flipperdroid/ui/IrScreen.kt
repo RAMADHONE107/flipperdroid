@@ -2,6 +2,10 @@ package dev.flipperdroid.ui
 
 import android.content.Context
 import android.hardware.ConsumerIrManager
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,8 +38,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.flipperdroid.ir.IrButton
+import dev.flipperdroid.ir.IrEncoder
+import dev.flipperdroid.ir.IrFileParser
 import dev.flipperdroid.ir.IrStore
-import dev.flipperdroid.ir.Nec
+import java.util.UUID
 
 @Composable
 fun IrScreen(onBack: () -> Unit) {
@@ -47,6 +53,7 @@ fun IrScreen(onBack: () -> Unit) {
 
     var buttons by remember { mutableStateOf(store.load()) }
     var status by remember { mutableStateOf("") }
+    var skippedInfo by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
     var command by remember { mutableStateOf("") }
@@ -72,42 +79,129 @@ fun IrScreen(onBack: () -> Unit) {
             status = "HP ini tidak punya IR emitter."
             return
         }
+        val pattern = IrEncoder.build(button)
+        if (pattern == null) {
+            status = "Protokol ${button.protocol} belum didukung. Pakai file raw."
+            return
+        }
         status = try {
-            service.transmit(button.frequency, Nec.pattern(button.address, button.command))
-            "→ ${button.name} (NEC ${button.addressHex()} ${button.commandHex()})"
+            service.transmit(IrEncoder.frequencyFor(button), pattern)
+            "→ ${button.name} • ${button.describe()}"
         } catch (e: Exception) {
             "Gagal kirim: ${e.message}"
         }
     }
 
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+
+        val known = buttons.map { it.signature() }.toMutableSet()
+        val imported = mutableListOf<IrButton>()
+        val skipped = mutableListOf<String>()
+        var failedFiles = 0
+
+        for (uri in uris) {
+            val fileName = displayName(ctx, uri) ?: "import.ir"
+            val text = readText(ctx, uri)
+            if (text == null) {
+                failedFiles++
+                continue
+            }
+            val source = fileName.removeSuffix(".ir").ifBlank { fileName }
+            val parsed = IrFileParser.parse(text, source)
+            for (button in parsed.buttons) {
+                if (known.add(button.signature())) imported.add(button)
+            }
+            skipped.addAll(parsed.skipped)
+        }
+
+        if (imported.isNotEmpty()) {
+            buttons = (buttons + imported).toMutableList()
+            store.save(buttons)
+        }
+
+        status = buildString {
+            append("${imported.size} sinyal diimpor")
+            if (skipped.isNotEmpty()) append(" • ${skipped.size} dilewati")
+            if (failedFiles > 0) append(" • $failedFiles file gagal dibaca")
+        }
+        skippedInfo = if (skipped.isEmpty()) "" else skipped.take(8).joinToString("\n")
+    }
+
     FlipperScreen(
         title = "Infrared",
-        subtitle = "NEC 38 kHz • transmitter",
+        subtitle = "NEC • Samsung • Sony • RC5 • RAW",
         onBack = onBack
     ) {
         Panel(title = "status hardware") {
             KeyValue("IR emitter", if (emitter) "ADA" else "TIDAK ADA", if (emitter) FlipperGreen else FlipperRed)
             KeyValue("Carrier 38 kHz", if (has38k) "didukung" else "cek manual")
-            KeyValue("Modulasi", "NEC (lainnya: import nanti)")
+            KeyValue("Tombol tersimpan", "${buttons.size}")
+        }
+
+        Gap()
+
+        Panel(title = "impor file .ir") {
+            Mono(
+                "Format Flipper Zero / IRDB. Sinyal \"parsed\" di-encode ulang, sinyal \"raw\" direplay apa adanya (cocok untuk remote AC).",
+                10,
+                FlipperDim
+            )
+            Gap(4)
+            Mono("Protokol: NEC, NECext, Samsung32, SIRC/15/20, RC5, RAW.", 10, FlipperDim)
+            Gap(10)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { importLauncher.launch(arrayOf("*/*")) },
+                    colors = ButtonDefaults.buttonColors(containerColor = FlipperOrange, contentColor = Color.Black)
+                ) {
+                    Text(
+                        "PILIH FILE .IR",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Button(
+                    onClick = {
+                        buttons = mutableListOf()
+                        store.save(buttons)
+                        status = "Semua tombol dihapus."
+                        skippedInfo = ""
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = FlipperPanel, contentColor = FlipperOrange)
+                ) {
+                    Text("HAPUS SEMUA", fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                }
+            }
+            if (status.isNotEmpty()) {
+                Gap(8)
+                Mono(status, 11, FlipperOrange)
+            }
+            if (skippedInfo.isNotEmpty()) {
+                Gap(6)
+                Mono(skippedInfo, 9, FlipperDim)
+            }
         }
 
         Gap()
 
         Panel(title = "tombol tersimpan") {
+            if (buttons.isEmpty()) {
+                Mono("Belum ada tombol. Impor .ir atau tambah manual di bawah.", 10, FlipperDim)
+            }
             buttons.forEach { button ->
                 IrButtonRow(
                     button = button,
                     onFire = { fire(button) },
                     onDelete = {
-                        buttons = buttons.filter { it != button }.toMutableList()
+                        buttons = buttons.filter { it.id != button.id }.toMutableList()
                         store.save(buttons)
                     }
                 )
                 Gap(8)
-            }
-            if (status.isNotEmpty()) {
-                Gap(4)
-                Mono(status, 11, FlipperOrange)
             }
         }
 
@@ -146,7 +240,13 @@ fun IrScreen(onBack: () -> Unit) {
                             status = "Address/command harus hex, mis. 04 atau 0x04"
                         } else {
                             val label = name.ifBlank { "Remote ${buttons.size + 1}" }
-                            val newButton = IrButton(label, "NEC", a, c)
+                            val newButton = IrButton(
+                                id = UUID.randomUUID().toString(),
+                                name = label,
+                                protocol = "NEC",
+                                address = a,
+                                command = c
+                            )
                             buttons = (buttons + newButton).toMutableList()
                             store.save(buttons)
                             name = ""
@@ -163,7 +263,11 @@ fun IrScreen(onBack: () -> Unit) {
         }
 
         Gap()
-        Mono("Tips: kode NEC sering ditulis di forum remote. Format 0xADDR / 0xCMD. Kalau TV nggak merespons, coba address 0x00.", 10, FlipperDim)
+        Mono(
+            "Tips: cari \"kode remote [merek] NEC hex\" atau download file .ir dari repo Flipper IRDB, lalu impor di sini. Kalau TV nggak merespons, coba address 0x00 atau protokol lain.",
+            10,
+            FlipperDim
+        )
     }
 }
 
@@ -171,6 +275,21 @@ private fun parseHex(raw: String): Int? {
     val clean = raw.trim().removePrefix("0x").removePrefix("0X")
     if (clean.isEmpty()) return null
     return clean.toIntOrNull(16)
+}
+
+private fun readText(ctx: Context, uri: Uri): String? = try {
+    ctx.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+} catch (e: Exception) {
+    null
+}
+
+private fun displayName(ctx: Context, uri: Uri): String? = try {
+    ctx.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+        val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else null
+    }
+} catch (e: Exception) {
+    null
 }
 
 @Composable
@@ -221,7 +340,10 @@ private fun IrButtonRow(button: IrButton, onFire: () -> Unit, onDelete: () -> Un
         androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
             Text(button.name, color = FlipperText, fontSize = 14.sp)
             Text(
-                "${button.protocol} ${button.addressHex()} ${button.commandHex()} @ ${button.frequency / 1000} kHz",
+                buildString {
+                    append(button.describe())
+                    if (button.source.isNotBlank()) append(" • ${button.source}")
+                },
                 color = FlipperDim,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 10.sp

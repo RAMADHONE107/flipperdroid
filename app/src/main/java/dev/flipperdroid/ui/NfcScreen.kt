@@ -113,11 +113,14 @@ fun NfcScreen(onBack: () -> Unit) {
                 status = "NFC mati. Nyalakan dulu di Setelan, lalu kembali ke sini."
                 return
             }
-            // enableReaderMode mengembalikan false kalau activity belum foreground,
-            // jadi wajib dipanggil saat ON_RESUME dan hasilnya diperiksa.
+            // Reader mode hanya efektif kalau activity sudah di foreground, jadi
+            // dipanggil saat ON_RESUME, bukan saat komposisi awal.
             var ok = false
             try {
-                ok = nfc.enableReaderMode(act, callback, flags, null)
+                // Di Android API 34 signature-nya void: tidak ada return value
+                // yang bisa dicek, jadi keberhasilan dideteksi dari exception.
+                nfc.enableReaderMode(act, callback, flags, null)
+                ok = true
             } catch (e: Exception) {
                 status = "Gagal aktifkan reader: ${e.message}"
             }

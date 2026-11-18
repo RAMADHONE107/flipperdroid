@@ -1,5 +1,8 @@
 package dev.flipperdroid.ui
 
+import android.content.Context
+import android.hardware.ConsumerIrManager
+import android.nfc.NfcAdapter
 import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
@@ -14,6 +17,20 @@ fun CapsScreen(onBack: () -> Unit) {
     val hasBt = Caps.hasBluetooth(ctx)
     val hasHost = Caps.hasUsbHost(ctx)
     val usbCount = Caps.usbDeviceCount(ctx)
+
+    val nfcOn = try {
+        NfcAdapter.getDefaultAdapter(ctx)?.isEnabled == true
+    } catch (e: Exception) {
+        false
+    }
+    val carriers = try {
+        val ir = ctx.getSystemService(Context.CONSUMER_IR_SERVICE) as? ConsumerIrManager
+        ir?.carrierFrequencies
+            ?.joinToString(", ") { "${it.minFrequency / 1000}-${it.maxFrequency / 1000} kHz" }
+            ?.ifBlank { "-" } ?: "-"
+    } catch (e: Exception) {
+        "-"
+    }
 
     FlipperScreen(
         title = "Kapabilitas HP",
@@ -31,7 +48,13 @@ fun CapsScreen(onBack: () -> Unit) {
 
         Panel(title = "fitur yang bisa dipakai") {
             KeyValue("IR emitter", if (hasIr) "ADA" else "TIDAK ADA", if (hasIr) FlipperGreen else FlipperRed)
+            KeyValue("IR carrier", carriers)
             KeyValue("NFC", if (hasNfc) "ADA" else "TIDAK ADA", if (hasNfc) FlipperGreen else FlipperRed)
+            KeyValue(
+                "NFC menyala",
+                if (!hasNfc) "-" else if (nfcOn) "ya" else "tidak",
+                if (!hasNfc) FlipperDim else if (nfcOn) FlipperGreen else FlipperRed
+            )
             KeyValue("Bluetooth", if (hasBt) "ADA" else "TIDAK ADA", if (hasBt) FlipperGreen else FlipperRed)
             KeyValue("USB host (OTG)", if (hasHost) "didukung" else "tidak", if (hasHost) FlipperGreen else FlipperRed)
             KeyValue("Perangkat USB", "$usbCount terpasang")

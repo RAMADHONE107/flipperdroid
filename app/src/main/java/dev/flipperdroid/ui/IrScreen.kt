@@ -97,13 +97,19 @@ fun IrScreen(onBack: () -> Unit) {
     }
 
     fun importLibrary(device: IrLibrary.Device) {
+        // Asset disimpan di assets/ir/, sedangkan IrLibrary hanya menyimpan nama
+        // filenya. Fallback ke nama polos supaya tetap jalan kalau lokasinya berubah.
         val text = try {
-            ctx.assets.open(device.asset).bufferedReader().use { it.readText() }
+            ctx.assets.open("ir/${device.asset}").bufferedReader().use { it.readText() }
         } catch (e: Exception) {
-            null
+            try {
+                ctx.assets.open(device.asset).bufferedReader().use { it.readText() }
+            } catch (e2: Exception) {
+                null
+            }
         }
         if (text == null) {
-            status = "Gagal membaca ${device.asset} dari asset."
+            status = "Gagal membaca assets/ir/${device.asset}."
             return
         }
 

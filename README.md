@@ -8,7 +8,7 @@ hardware HP untuk melakukan sebagian fungsi Flipper — dan jujur soal yang tida
 
 ---
 
-## Fitur v0.6
+## Fitur v0.6.1
 
 | Menu | Status | Keterangan |
 |---|---|---|
@@ -22,6 +22,13 @@ hardware HP untuk melakukan sebagian fungsi Flipper — dan jujur soal yang tida
 | **iButton** | ⛔ hardware | Butuh reader 1-Wire. |
 | **Kapabilitas HP** | ✅ | Deteksi runtime: IR, NFC, BT, USB host, model, SDK. |
 | **Tentang** | ✅ | Lisensi & batasan. |
+
+### Perbaikan 0.6.1
+
+- Library remote gagal dibuka (`Gagal membaca ... dari asset`) karena file ada di `assets/ir/` — path-nya diperbaiki.
+- NFC reader mode sekarang diaktifkan saat `ON_RESUME` dan hasil `enableReaderMode` diperiksa (sebelumnya bisa gagal diam-diam kalau dipanggil sebelum activity foreground).
+- NDEF dibaca langsung kalau cache kosong; UID tidak lagi crash untuk tag tanpa ID.
+- "Hapus semua" tidak lagi memunculkan 4 tombol default setelah app dibuka ulang.
 
 Fitur yang **tidak** diklaim: clone UID kartu akses, buka gerbang, tembus
 sub-GHz, emulate iButton. Itu butuh hardware fisik, bukan software.

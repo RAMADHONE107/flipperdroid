@@ -23,16 +23,36 @@ object NfcReader {
         } catch (e: Exception) {
             null
         }
-        val message = try {
+        var message = try {
             ndef?.cachedNdefMessage
         } catch (e: Exception) {
             null
         }
+        // Sebagian reader mode / tag tidak mengisi cache, jadi baca langsung.
+        if (message == null && ndef != null) {
+            message = try {
+                ndef.connect()
+                val direct = ndef.ndefMessage
+                ndef.close()
+                direct
+            } catch (e: Exception) {
+                try {
+                    ndef.close()
+                } catch (ignored: Exception) {
+                    // diabaikan
+                }
+                null
+            }
+        }
         val records = message?.records?.map { describe(it) } ?: emptyList()
         return TagInfo(
-            uid = tag.id.joinToString(":") { byte -> "%02X".format(byte) },
+            uid = tag.id?.joinToString(":") { byte -> "%02X".format(byte) } ?: "-",
             techs = techs,
-            maxSize = ndef?.maxSize ?: 0,
+            maxSize = try {
+                ndef?.maxSize ?: 0
+            } catch (e: Exception) {
+                0
+            },
             records = records,
             readableNdef = message != null
         )

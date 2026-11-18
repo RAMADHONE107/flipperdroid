@@ -28,7 +28,9 @@ class IrStore(context: Context) {
                     )
                 )
             }
-            if (list.isEmpty()) defaults() else list
+            // Daftar kosong itu sah (user menekan "hapus semua"); jangan
+            // dikembalikan ke default, nanti tombol yang dihapus muncul lagi.
+            list
         } catch (e: Exception) {
             defaults()
         }

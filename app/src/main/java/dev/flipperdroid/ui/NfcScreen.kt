@@ -4,8 +4,10 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.nfc.NfcAdapter
 import android.nfc.Tag
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,10 +25,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import dev.flipperdroid.nfc.NfcReader
 import dev.flipperdroid.nfc.TagInfo
 import dev.flipperdroid.nfc.UltralightDump
@@ -50,47 +55,104 @@ fun NfcScreen(onBack: () -> Unit) {
         )
     }
     var text by remember { mutableStateOf("https://example.com") }
+    var nfcOn by remember { mutableStateOf(adapter?.isEnabled == true) }
+    var readerActive by remember { mutableStateOf(false) }
+    var retry by remember { mutableStateOf(0) }
 
-    DisposableEffect(adapter, activity) {
-        if (adapter != null && activity != null) {
-            val callback = NfcAdapter.ReaderCallback { tag ->
-                val read = NfcReader.read(tag)
-                // Callback ini jalan di binder thread, jadi aman untuk I/O NFC.
-                val ultralight = try {
-                    if (tag.techList.any { it.endsWith("MifareUltralight") }) {
-                        UltralightDump.dump(tag)
-                    } else {
-                        null
-                    }
-                } catch (e: Exception) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(adapter, activity, lifecycleOwner, retry) {
+        val nfc = adapter
+        val act = activity
+        if (nfc == null || act == null) {
+            return@DisposableEffect onDispose { }
+        }
+
+        val callback = NfcAdapter.ReaderCallback { tag ->
+            val read = try {
+                NfcReader.read(tag)
+            } catch (e: Exception) {
+                null
+            }
+            // Callback ini jalan di binder thread, jadi aman untuk I/O NFC.
+            val ultralight = try {
+                if (tag.techList.any { it.endsWith("MifareUltralight") }) {
+                    UltralightDump.dump(tag)
+                } else {
                     null
                 }
-                activity.runOnUiThread {
+            } catch (e: Exception) {
+                null
+            }
+            act.runOnUiThread {
+                if (read != null) {
                     lastTag = tag
                     info = read
                     dump = ultralight
                     status = "Tag terbaca."
+                } else {
+                    status = "Tag terdeteksi, tapi gagal dibaca. Coba tempel ulang."
                 }
-            }
-            val flags = NfcAdapter.FLAG_READER_NFC_A or
-                NfcAdapter.FLAG_READER_NFC_B or
-                NfcAdapter.FLAG_READER_NFC_F or
-                NfcAdapter.FLAG_READER_NFC_V or
-                NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS
-            try {
-                adapter.enableReaderMode(activity, callback, flags, null)
-            } catch (e: Exception) {
-                status = "Gagal aktifkan reader: ${e.message}"
             }
         }
-        onDispose {
-            if (adapter != null && activity != null) {
-                try {
-                    adapter.disableReaderMode(activity)
-                } catch (e: Exception) {
-                    // diabaikan
-                }
+
+        val flags = NfcAdapter.FLAG_READER_NFC_A or
+            NfcAdapter.FLAG_READER_NFC_B or
+            NfcAdapter.FLAG_READER_NFC_F or
+            NfcAdapter.FLAG_READER_NFC_V or
+            NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS
+
+        fun enable() {
+            nfcOn = try {
+                nfc.isEnabled
+            } catch (e: Exception) {
+                false
             }
+            if (!nfcOn) {
+                readerActive = false
+                status = "NFC mati. Nyalakan dulu di Setelan, lalu kembali ke sini."
+                return
+            }
+            // enableReaderMode mengembalikan false kalau activity belum foreground,
+            // jadi wajib dipanggil saat ON_RESUME dan hasilnya diperiksa.
+            val ok = try {
+                nfc.enableReaderMode(act, callback, flags, null)
+            } catch (e: Exception) {
+                status = "Gagal aktifkan reader: ${e.message}"
+                false
+            }
+            readerActive = ok
+            status = if (ok) {
+                "Reader aktif — tempelkan tag ke punggung HP."
+            } else {
+                "Reader mode gagal aktif. Tutup-buka layar NFC atau tekan COBA LAGI."
+            }
+        }
+
+        fun disable() {
+            readerActive = false
+            try {
+                nfc.disableReaderMode(act)
+            } catch (e: Exception) {
+                // diabaikan
+            }
+        }
+
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> enable()
+                Lifecycle.Event.ON_PAUSE -> disable()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            enable()
+        }
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            disable()
         }
     }
 
@@ -101,10 +163,33 @@ fun NfcScreen(onBack: () -> Unit) {
     ) {
         Panel(title = "status") {
             KeyValue("Adapter", if (adapter != null) "ADA" else "TIDAK ADA", if (adapter != null) FlipperGreen else FlipperRed)
-            KeyValue("Aktif", if (adapter?.isEnabled == true) "ya" else "tidak", if (adapter?.isEnabled == true) FlipperGreen else FlipperRed)
-            KeyValue("Mode", "reader mode (foreground)")
+            KeyValue("NFC", if (nfcOn) "menyala" else "mati", if (nfcOn) FlipperGreen else FlipperRed)
+            KeyValue("Reader mode", if (readerActive) "aktif" else "tidak aktif", if (readerActive) FlipperGreen else FlipperRed)
             Gap(8)
             Mono(status, 11, FlipperOrange)
+            if (!nfcOn || !readerActive) {
+                Gap(10)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { retry++ },
+                        colors = ButtonDefaults.buttonColors(containerColor = FlipperOrange, contentColor = Color.Black)
+                    ) {
+                        Text("COBA LAGI", fontFamily = FontFamily.Monospace, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = {
+                            try {
+                                ctx.startActivity(Intent(Settings.ACTION_NFC_SETTINGS))
+                            } catch (e: Exception) {
+                                status = "Gagal buka setelan: ${e.message}"
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = FlipperPanel, contentColor = FlipperOrange)
+                    ) {
+                        Text("SETELAN NFC", fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                    }
+                }
+            }
         }
 
         Gap()

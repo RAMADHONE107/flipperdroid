@@ -1,10 +1,10 @@
 package dev.flipperdroid.nfc
 
-import android.nfc.Ndef
-import android.nfc.NdefFormatable
 import android.nfc.NdefMessage
 import android.nfc.NdefRecord
 import android.nfc.Tag
+import android.nfc.tech.Ndef
+import android.nfc.tech.NdefFormatable
 
 data class TagInfo(
     val uid: String,

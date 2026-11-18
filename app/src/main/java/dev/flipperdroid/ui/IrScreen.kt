@@ -60,7 +60,7 @@ fun IrScreen(onBack: () -> Unit) {
     }
     val has38k = remember {
         try {
-            ir?.hasIrFrequency(38000) == true
+            ir?.carrierFrequencies?.any { 38000 in it.minFrequency..it.maxFrequency } == true
         } catch (e: Exception) {
             false
         }

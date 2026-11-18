@@ -64,6 +64,24 @@ object NfcReader {
     }
 
     private fun describe(record: NdefRecord): String {
+        return describeRecord(record)
+    }
+
+    fun describeMessage(message: NdefMessage?): List<String> =
+        message?.records?.map { describeRecord(it) } ?: emptyList()
+
+    /** Ambil teks dari record TEXT pertama, kalau ada. */
+    fun textOf(message: NdefMessage?): String? {
+        val record = message?.records?.firstOrNull() ?: return null
+        if (String(record.type, Charsets.UTF_8) != "T") return null
+        val raw = record.payload
+        if (raw.isEmpty()) return null
+        val langLength = raw[0].toInt() and 0x3F
+        val start = 1 + langLength
+        return if (start < raw.size) String(raw, start, raw.size - start, Charsets.UTF_8) else null
+    }
+
+    fun describeRecord(record: NdefRecord): String {
         val type = try {
             String(record.type, Charsets.UTF_8)
         } catch (e: Exception) {

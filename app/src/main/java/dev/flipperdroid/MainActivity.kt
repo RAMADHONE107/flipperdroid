@@ -16,6 +16,7 @@ import dev.flipperdroid.ui.AboutScreen
 import dev.flipperdroid.ui.CapsScreen
 import dev.flipperdroid.ui.FlipperTheme
 import dev.flipperdroid.ui.HardwareMissingScreen
+import dev.flipperdroid.ui.HceScreen
 import dev.flipperdroid.ui.HidScreen
 import dev.flipperdroid.ui.HomeScreen
 import dev.flipperdroid.ui.IrScreen
@@ -46,6 +47,7 @@ private fun App() {
         Screen.Home -> HomeScreen(onOpen = { screen = it })
         Screen.Ir -> IrScreen(onBack = { screen = Screen.Home })
         Screen.Nfc -> NfcScreen(onBack = { screen = Screen.Home })
+        Screen.Hce -> HceScreen(onBack = { screen = Screen.Home })
         Screen.Hid -> HidScreen(onBack = { screen = Screen.Home })
         Screen.Caps -> CapsScreen(onBack = { screen = Screen.Home })
         Screen.About -> AboutScreen(onBack = { screen = Screen.Home })

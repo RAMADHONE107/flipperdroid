@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.SettingsRemote
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.Text
@@ -27,7 +28,7 @@ import androidx.compose.ui.unit.sp
 import dev.flipperdroid.caps.Caps
 
 enum class Screen {
-    Home, Ir, Nfc, Hid, SubGhz, Rfid, IButton, Caps, About
+    Home, Ir, Nfc, Hce, Hid, SubGhz, Rfid, IButton, Caps, About
 }
 
 @Composable
@@ -70,6 +71,14 @@ fun HomeScreen(onOpen: (Screen) -> Unit) {
             sub = "Baca UID, tulis NDEF, info teknologi",
             badge = if (hasNfc) "READY" else "N/A"
         ) { onOpen(Screen.Nfc) }
+        Gap(8)
+
+        MenuRow(
+            icon = Icons.Filled.Share,
+            label = "NFC Emulator",
+            sub = "HP jadi kartu NDEF (Host Card Emulation)",
+            badge = if (hasNfc) "READY" else "N/A"
+        ) { onOpen(Screen.Hce) }
         Gap(8)
 
         MenuRow(

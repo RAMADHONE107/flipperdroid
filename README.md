@@ -14,6 +14,7 @@ hardware HP untuk melakukan sebagian fungsi Flipper — dan jujur soal yang tida
 |---|---|---|
 | **Infrared** | ✅ jalan | Kirim kode NEC 38 kHz lewat IR blaster. Tombol bisa ditambah manual (address/command hex) dan disimpan. |
 | **NFC** | ✅ jalan | Reader mode: baca UID, daftar teknologi, isi NDEF. Tulis teks/link ke tag NDEF atau format tag kosong. |
+| **NFC Emulator (HCE)** | ✅ jalan | HP jadi kartu NFC Forum Type 4 Tag. Emulasi NDEF text/URL lewat APDU (`D2760000850101`), bisa dibaca HP lain / Flipper / reader USB. |
 | **Bad-BT Keyboard** | ✅ jalan | HP jadi keyboard HID Bluetooth. Pasangkan ke PC, lalu "ketik" payload otomatis. |
 | **Sub-GHz** | ⛔ hardware | Butuh CC1101. Halaman menampilkan status OTG + penjelasan. |
 | **RFID 125 kHz** | ⛔ hardware | Butuh reader 125 kHz (Proxmark3/RDM6300). |
@@ -72,7 +73,7 @@ app/src/main/java/dev/flipperdroid/
 - [ ] Import file `.ir` dari database IR (format Flipper/IRDB) + protokol RC5, Sony SIRC, Samsung
 - [ ] Import/export tombol IR ke file JSON
 - [ ] Sub-GHz RX via CC1101 + USB serial (OTG)
-- [ ] NFC: HCE untuk emulate NDEF, dump MIFARE Ultralight
+- [ ] NFC: dump MIFARE Ultralight, emulate NDEF dengan beberapa record sekaligus
 - [ ] Widget cepat: "TV Power" di layar utama
 - [ ] Tema: opsi font pixel & animasi dolphin
 

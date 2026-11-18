@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FlipperDroid</string>
+    <string name="hce_description">FlipperDroid NDEF emulator (Type 4 Tag)</string>
+    <string name="hce_aid_group">FlipperDroid NDEF</string>
+</resources>

@@ -115,11 +115,11 @@ fun NfcScreen(onBack: () -> Unit) {
             }
             // enableReaderMode mengembalikan false kalau activity belum foreground,
             // jadi wajib dipanggil saat ON_RESUME dan hasilnya diperiksa.
-            val ok = try {
-                nfc.enableReaderMode(act, callback, flags, null)
+            var ok = false
+            try {
+                ok = nfc.enableReaderMode(act, callback, flags, null)
             } catch (e: Exception) {
                 status = "Gagal aktifkan reader: ${e.message}"
-                false
             }
             readerActive = ok
             status = if (ok) {
